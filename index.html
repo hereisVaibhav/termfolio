@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>termfolio – terminal-style GitHub profile generator</title>
+<style>
+:root{--bg:#f6f8fa;--card:#fff;--line:#d0d7de;--text:#1f2328;--mut:#59636e;--acc:#1a7f37;--inp:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--card:#161b22;--line:#30363d;--text:#c9d1d9;--mut:#8b949e;--acc:#3fb950;--inp:#0d1117;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1117;--card:#161b22;--line:#30363d;--text:#c9d1d9;--mut:#8b949e;--acc:#3fb950;--inp:#0d1117;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+.mono{font-family:'SF Mono','Fira Code',Consolas,Menlo,monospace}
+header{padding:28px 20px 8px;max-width:1200px;margin:0 auto}
+h1{margin:0;font-size:28px;color:var(--acc)}
+header p{margin:6px 0 0;color:var(--mut)}
+main{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:20px;max-width:1200px;margin:0 auto;padding:16px 20px 40px}
+@media (max-width:860px){main{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;background:var(--inp);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit;font-size:14px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px}
+textarea{resize:vertical;min-height:70px}
+.frow{display:grid;grid-template-columns:90px 1fr 32px;gap:6px;margin-bottom:6px}
+.frow button{padding:0}
+button{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:inherit;font-size:14px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.sw{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sw button{width:28px;height:28px;padding:0;border-radius:50%}
+.sw input[type=color]{width:34px;height:30px;padding:2px}
+.prev{overflow-x:auto;border-radius:10px;background:#0d1117;border:1px solid var(--line)}
+.prev svg{display:block;width:100%;min-width:640px;height:auto}
+.prev>div{margin-bottom:12px}.prev>div:last-child{margin:0}
+details.x{margin:8px 0;border:1px solid var(--line);border-radius:8px;padding:8px 10px}details.x summary{cursor:pointer;font-size:14px}
+.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:6px 0;font-size:14px}.chk input{width:auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+pre,.out{background:var(--inp);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:12px;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+ol{margin:6px 0 0;padding-left:20px;color:var(--mut);font-size:14px}
+#msg{color:var(--acc);font-size:13px;min-height:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1 class="mono">$ termfolio</h1>
+  <p>Generate an animated, terminal-style GitHub profile README, plus skills, stats and character cards, in under a minute. Free and open source.</p>
+</header>
+<main>
+  <section>
+    <div class="card">
+      <h2>Identity</h2>
+      <label for="handle">GitHub username</label>
+      <input id="handle" placeholder="your-username" autocomplete="off">
+      <h2 style="margin-top:16px">Info lines</h2>
+      <div id="fields"></div>
+      <button id="addf" type="button">+ Add line</button>
+    </div>
+    <div class="card">
+      <h2>Style</h2>
+      <label for="art">Animated art</label>
+      <select id="art"><option value="inv">Pixel invader</option><option value="rocket">Rocket</option><option value="ghost">Ghost</option><option value="robot">Robot</option><option value="heart">Beating heart</option><option value="coffee">Coffee cup</option><option value="ufo">UFO</option><option value="custom">Custom (paste your own)</option><option value="none">None</option></select>
+      <div id="cwrap" style="display:none"><label for="grid">Paste a pixel grid: # = filled, . = empty. Add a blank line, then another grid, to animate (up to 4 frames, 24×24).</label><textarea id="grid" class="mono" rows="9" spellcheck="false"></textarea><div class="row"><button id="gex" type="button">Load example</button></div></div>
+      <label>Accent color</label>
+      <div class="sw" id="sw"></div>
+    </div>
+    <div class="card">
+      <h2>Plan (~/.plan)</h2>
+      <label for="plan">One per line. Start with [x], [~] or [ ]</label>
+      <textarea id="plan" rows="4">[x] something you've built
+[~] something you're learning</textarea>
+    </div>
+    <div class="card">
+      <h2>Extra cards</h2>
+      <details class="x"><summary>Skills card</summary><label class="chk"><input type="checkbox" id="on_skills" checked> Include this card</label><label for="t_skills">One per line, as Name: percent</label><textarea id="t_skills" rows="8" class="mono"></textarea></details>
+      <details class="x"><summary>Performance rings</summary><label class="chk"><input type="checkbox" id="on_perf" checked> Include this card</label><label for="t_perf">4 lines, as Name: percent (overall is the average)</label><textarea id="t_perf" rows="4" class="mono"></textarea></details>
+      <details class="x"><summary>Stats card</summary><label class="chk"><input type="checkbox" id="on_stats" checked> Include this card</label><label for="t_stats">4 lines, as Number | Label</label><textarea id="t_stats" rows="4" class="mono"></textarea></details>
+      <details class="x"><summary>Animated characters</summary><label class="chk"><input type="checkbox" id="on_traits" checked> Include this card</label><label for="t_traits">4 lines, as TITLE | subtitle</label><textarea id="t_traits" rows="4" class="mono"></textarea><div id="chars"></div></details>
+      <details class="x"><summary>ID card</summary><label class="chk"><input type="checkbox" id="on_id" checked> Include this card</label><label for="t_idh">Header text</label><input id="t_idh" value="DEVELOPER ID"><label for="t_id">ID number</label><input id="t_id" value="ID-0001"><label>Uses the first 5 lines of Info lines</label></details>
+      <details class="x"><summary>“Let’s build together” grid</summary><label class="chk"><input type="checkbox" id="on_build" checked> Include this card</label><label for="t_bsub">Subtitle</label><input id="t_bsub"><label for="t_build">6 lines, as icon | Title | Subtitle</label><textarea id="t_build" rows="6" class="mono"></textarea></details>
+    </div>
+    <div class="card">
+      <h2>Link buttons (optional)</h2>
+      <label for="l1">LinkedIn URL</label><input id="l1" placeholder="https://linkedin.com/in/you">
+      <label for="l2">Website URL</label><input id="l2" placeholder="https://you.dev">
+      <label for="l3">Email</label><input id="l3" placeholder="you@mail.com">
+      <label for="l4">X / Twitter URL</label><input id="l4" placeholder="https://x.com/you">
+    </div>
+  </section>
+  <section>
+    <div class="card">
+      <h2>Live preview</h2>
+      <div class="prev" id="prev"></div>
+      <div class="row">
+        <button class="pri" id="cs" type="button">Copy SVG</button>
+        <button id="ds" type="button">Download SVG</button>
+        <button id="cr" type="button">Copy README.md</button>
+      </div>
+      <div id="msg" role="status"></div>
+    </div>
+    <div class="card">
+      <h2>How to use it</h2>
+      <ol>
+        <li>Create a public repo named exactly like your username, with a README.</li>
+        <li>Pick each file in the “SVG file” list, then save it (terminal.svg, skills.svg …) and upload them all to that repo. Upload files, don’t paste into the editor.</li>
+        <li>Replace README.md with the generated README. Commit and refresh your profile.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>README.md</h2>
+      <pre class="mono" id="readme"></pre>
+      <h2 style="margin-top:14px">SVG file</h2>
+      <select id="ofile"></select>
+      <pre class="mono" id="code" style="margin-top:8px"></pre>
+    </div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ascii=s=>Array.from(s).map(c=>c.codePointAt(0)>127?'&#'+c.codePointAt(0)+';':c).join('');
+let accent='#3fb950';
+const COLORS=['#3fb950','#56d4dd','#d2a8ff','#ffa657','#ff7b72','#e3b341'];
+const DEF=[['Name','Enter your name'],['Role','Your role'],['OS','Your education'],['Kernel','Your skills'],['Shell','Your location'],['Status','Your status']];
+
+function addRow(k='',v='',ph=false){
+  if(document.querySelectorAll('.frow').length>=8)return;
+  const d=document.createElement('div');d.className='frow';
+  d.innerHTML='<input placeholder="Label" maxlength="10"><input placeholder="Value" maxlength="40"><button type="button" title="Remove">×</button>';
+  d.children[0].value=k;if(ph){d.children[1].placeholder=v;d.dataset.ph=v}else d.children[1].value=v;
+  d.children[2].onclick=()=>{d.remove();render()};
+  d.oninput=render;$('fields').appendChild(d);
+}
+DEF.forEach(r=>addRow(r[0],r[1],true));
+$('addf').onclick=()=>{addRow();render()};
+COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;b.title=c;b.onclick=()=>{accent=c;cp.value=c;render()};$('sw').appendChild(b)});
+const cp=document.createElement('input');cp.type='color';cp.value=accent;cp.oninput=()=>{accent=cp.value;render()};$('sw').appendChild(cp);
+
+const ARTS={
+inv:[["..#.....#..","...#...#...","..#######..",".##.###.##.","###########","#.#######.#","#.#.....#.#","...##.##..."],["..#.....#..","#..#...#..#","#.#######.#","###.###.###","###########",".#########.","..#.....#..",".#.......#."]],
+rocket:[["....#....","...###...","..#####..","..#.#.#..","..#####..",".#######.",".#######.","#.#####.#","#.#####.#","..#...#..","...###...","....#...."],["....#....","...###...","..#####..","..#.#.#..","..#####..",".#######.",".#######.","#.#####.#","#.#####.#","..#.#.#..","...###...","...###..."]],
+ghost:[["...#####...","..#######..",".#########.",".#..###..#.",".#..###..#.",".#########.",".#########.",".#########.",".##.###.##.",".#...#...#."],["...#####...","..#######..",".#########.",".#..###..#.",".#..###..#.",".#########.",".#########.",".#########.",".#.#####.#.","...#...#..."]],
+robot:[[".....#.....","....###....","..#######..",".#########.",".##.###.##.",".#########.",".##.....##.",".#########.","..#.....#..",".##.....##."],["......#....",".....###...","..#######..",".#########.",".##.###.##.",".#########.",".##.....##.",".#########.",".#.......#.","##.......##"]],
+heart:[["..###.###..",".#########.","###########","###########",".#########.","..#######..","...#####...","....###....",".....#....."],["...........","..##...##..",".#########.",".#########.",".#########.","..#######..","...#####...","....###....",".....#....."]],
+coffee:[["...#...#....","....#...#...","...#...#....","............",".#########..",".#########.#",".#########.#","..#######.#.","..#######...","...#####...."],["....#...#...","...#...#....","....#...#...","............",".#########..",".#########.#",".#########.#","..#######.#.","..#######...","...#####...."]],
+ufo:[[".....###.....","....#####....",".###########.","#############","#.##.##.##.##",".###########.","...#.....#...","..#.......#.."],[".....###.....","....#####....",".###########.","#############","##.##.##.##.#",".###########.","...#.....#...",".#.........#."]]
+};
+function anim(k,N){if(N<2)return'';let v,kt;if(k==0){v='1;0;0';kt=`0;${1/N};1`}else if(k==N-1){v='0;1';kt=`0;${k/N}`}else{v='0;1;0;0';kt=`0;${k/N};${(k+1)/N};1`}return `<animate attributeName="opacity" calcMode="discrete" values="${v}" keyTimes="${kt}" dur="${N*.5}s" repeatCount="indefinite"/>`}
+function parseGrid(){
+  const fr=$('grid').value.replace(/\r/g,'').split(/\n\s*\n/).map(b=>b.split('\n').map(l=>l.trimEnd()).filter(l=>l.length)).filter(f=>f.length).slice(0,4);
+  const f=fr.length?fr:[['#']];
+  const C=Math.min(24,Math.max(...f.flat().map(l=>l.length))),R=Math.min(24,Math.max(...f.map(x=>x.length)));
+  return f.map(x=>Array.from({length:R},(_,r)=>(x[r]||'').slice(0,C).padEnd(C,'.')));
+}
+function pix(n,A){
+  const fr=n=='custom'?parseGrid():ARTS[n],R=fr[0].length,C=fr[0][0].length,st=Math.min(22,Math.floor(260/Math.max(R,C))),px=st-2;
+  const x0=50+Math.floor((240-C*st)/2),y0=100+Math.floor((250-R*st)/2);
+  let g='';
+  fr.forEach((f,k)=>{
+    let d='';
+    f.forEach((row,r)=>{[...row].forEach((ch,c)=>{if('#Xx1█■*'.includes(ch))d+=`M${x0+c*st} ${y0+r*st}h${px}v${px}h-${px}z`})});
+    g+=`<g opacity="${k?0:1}"><path fill="${A}" d="${d}"/>${anim(k,fr.length)}</g>`;
+  });
+  return [g,y0+R*st];
+}
+
+function build(){
+  const A=accent,handle=($('handle').value.trim()||'your-username').replace(/\s+/g,'');
+  const rows=[...document.querySelectorAll('.frow')].map(r=>[r.children[0].value.trim(),r.children[1].value.trim()||r.dataset.ph||'']).filter(r=>r[0]||r[1]);
+  const plan=$('plan').value.split('\n').filter(l=>l.trim());
+  const art=$('art').value;
+  const [artSvg,artEnd]=art=='none'?['',0]:pix(art,A);
+  const ix=art=='none'?60:340;
+  const maxL=Math.max(1,...rows.map(r=>r[0].length+1));
+  const vx=Math.round(ix+(maxL+1)*9.2);
+  let y=156,info=`<text x="${ix}" y="110" fill="${A}" font-weight="bold">${esc(handle)}@github</text><text x="${ix}" y="128" fill="#8b949e">${'-'.repeat(handle.length+7)}</text>`;
+  rows.forEach(r=>{info+=`<text x="${ix}" y="${y}" fill="${A}" font-weight="bold">${esc(r[0])}:</text><text x="${vx}" y="${y}" fill="#c9d1d9">${esc(r[1])}</text>`;y+=26});
+  const barY=y-4,bc=['#ff7b72','#ffa657','#e3b341','#3fb950','#56d4dd','#79c0ff','#d2a8ff','#c9d1d9'];
+  const bar=bc.map((c,i)=>`<rect x="${ix+i*36}" y="${barY}" width="36" height="22" fill="${c}"/>`).join('');
+  const py=Math.max(artEnd,barY+22)+40;
+  let pl=`<text x="30" y="${py}" fill="${A}" font-weight="bold">${esc(handle)}@github<tspan fill="#8b949e">:~$</tspan><tspan fill="#c9d1d9"> cat ~/.plan</tspan></text>`;
+  let yy=py+24;
+  plan.forEach(l=>{const m=l.match(/^\s*\[(.?)\]\s*(.*)$/);pl+=m?`<text x="30" y="${yy}" fill="#c9d1d9"><tspan fill="#8b949e">[${esc(m[1]||' ')}]</tspan> ${esc(m[2])}</text>`:`<text x="30" y="${yy}" fill="#c9d1d9">${esc(l)}</text>`;yy+=22});
+  yy+=8;
+  const cx=30+(handle.length+10)*9+8;
+  pl+=`<text x="30" y="${yy}" fill="${A}" font-weight="bold">${esc(handle)}@github<tspan fill="#8b949e">:~$</tspan></text><rect x="${cx}" y="${yy-14}" width="9" height="17" fill="${A}"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.5;.5;1" dur="1.1s" repeatCount="indefinite"/></rect>`;
+  const H=yy+32;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="${H}" viewBox="0 0 900 ${H}" font-family="'SF Mono','Fira Code',Consolas,Menlo,monospace" font-size="15"><rect width="900" height="${H}" rx="12" fill="#0d1117" stroke="#30363d"/><path d="M0 12a12 12 0 0 1 12-12h876a12 12 0 0 1 12 12v28H0z" fill="#161b22"/><circle cx="26" cy="20" r="7" fill="#ff5f56"/><circle cx="50" cy="20" r="7" fill="#ffbd2e"/><circle cx="74" cy="20" r="7" fill="#27c93f"/><text x="450" y="25" text-anchor="middle" fill="#8b949e" font-size="13">${esc(handle)}@github: ~ — zsh</text><text x="30" y="72" fill="${A}" font-weight="bold">${esc(handle)}@github<tspan fill="#8b949e">:~$</tspan><tspan fill="#c9d1d9"> neofetch</tspan></text>${artSvg}${info}${bar}${pl}</svg>`;
+  return ascii(svg);
+}
+const FF="'SF Mono','Fira Code',Consolas,Menlo,monospace";
+const svgw=(w,h,b)=>`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" font-family="${FF}" font-size="14"><rect width="${w}" height="${h}" rx="12" fill="#0d1117" stroke="#30363d"/>${b}</svg>`;
+const tx=(x,y,s,f,z,b,a)=>`<text x="${x}" y="${y}" fill="${f||'#c9d1d9'}" font-size="${z||14}"${b?' font-weight="bold"':''} text-anchor="${a||'start'}">${esc(s)}</text>`;
+const rc=(x,y,w,h,f,e,i)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}" ${e||''}>${i||''}</rect>`;
+const an=(a,v,d,kt,b)=>`<animate attributeName="${a}" values="${v}"${kt?` keyTimes="${kt}"`:''} dur="${d}s" begin="${b||0}s" repeatCount="indefinite"/>`;
+const bar=t=>`<path d="M0 12a12 12 0 0 1 12-12h876a12 12 0 0 1 12 12v28H0z" fill="#161b22"/><circle cx="26" cy="20" r="7" fill="#ff5f56"/><circle cx="50" cy="20" r="7" fill="#ffbd2e"/><circle cx="74" cy="20" r="7" fill="#27c93f"/>`+tx(450,25,t,'#8b949e',13,0,'middle');
+const lines=id=>$(id).value.split('\n').map(l=>l.trim()).filter(Boolean);
+const num=(s,d)=>{const n=parseFloat(s);return isNaN(n)?d:Math.max(0,Math.min(100,n))};
+const kv=(id,max)=>lines(id).slice(0,max).map(l=>{const i=l.lastIndexOf(':');return i<0?[l,80]:[l.slice(0,i).trim(),num(l.slice(i+1),80)]});
+const pipe=(id,max)=>lines(id).slice(0,max).map(l=>l.split('|').map(s=>s.trim()));
+
+function skillsSVG(A){
+  let b=bar('skills.sh - running')+tx(30,70,'$ ./skills --show',A,14,1);
+  kv('t_skills',8).forEach(([n,v],i)=>{const x=40+(i>>2)*430,y=104+(i&3)*42,W=Math.round(230*v/100);
+    b+=tx(x,y+10,n.slice(0,16))+rc(x+140,y,230,10,'#21262d','rx="5"')+rc(x+140,y,0,10,A,'rx="5"',an('width',`0;${W};${W}`,7,'0;.25;1',(i*.15).toFixed(2)))+tx(x+380,y+10,v+'%','#8b949e',13)});
+  return svgw(900,280,b);
+}
+function ring(cx,cy,r,sw,v,col,lab,big){
+  const C=+(2*Math.PI*r).toFixed(1),off=+(C*(1-v/100)).toFixed(1);
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#21262d" stroke-width="${sw}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90 ${cx} ${cy})">${an('stroke-dashoffset',`${C};${off};${off}`,7,'0;.3;1')}</circle>`
+   +tx(cx,cy+(big?9:7),Math.round(v)+'%','#c9d1d9',big?26:20,1,'middle')+tx(cx,cy+r+34,lab.slice(0,14),big?col:'#8b949e',14,big,'middle');
+}
+function perfSVG(A){
+  const L=kv('t_perf',4);while(L.length<4)L.push(['Skill',50]);
+  const avg=Math.round(L.reduce((s,x)=>s+x[1],0)/4),cols=[A,'#56d4dd','#d2a8ff','#ffa657'];
+  let b=bar('performance.sh - overall')+tx(30,70,'$ ./performance --overall',A,14,1);
+  [L[0],L[1],['OVERALL',avg],L[2],L[3]].forEach(([n,v],i)=>{const cx=100+175*i;
+    b+=i==2?ring(cx,170,62,12,v,'#e3b341',n,true):ring(cx,170,46,10,v,cols[i<2?i:i-1],n,false)});
+  return svgw(900,300,b);
+}
+function statsSVG(A){
+  let b='';
+  pipe('t_stats',4).forEach(([n,t],i)=>{const x=30+i*215;
+    b+=rc(x,20,195,130,'#161b22','rx="10" stroke="#30363d"')+rc(x,20,0,3,A,'rx="1"',an('width','0;195;195;0',5,'0;.3;.8;1',(i*.25).toFixed(2)))
+     +`<text x="${x+97}" y="82" fill="${A}" font-size="44" font-weight="bold" text-anchor="middle">${esc(n||'')}${an('fill-opacity','.65;1;.65',3,0,(i*.4).toFixed(2))}</text>`+tx(x+97,118,(t||'').slice(0,24),'#8b949e',13,0,'middle')});
+  return svgw(900,170,b);
+}
+/* ---- pixel sprite engine ---- */
+const SKIN='#f2b88c',EYE='#1b1b2f',R=(x,y,w,h)=>['r',x,y,w,h],E=(x,y,a,b)=>['e',x,y,a,b],Pg=p=>['p',p];
+function shade(h,f){h=h.slice(1);if(h.length==3)h=[...h].map(c=>c+c).join('');const t=f>0?255:0,a=Math.abs(f);return '#'+[0,2,4].map(i=>Math.round(parseInt(h.substr(i,2),16)*(1-a)+t*a).toString(16).padStart(2,'0')).join('')}
+function cl(s){const k=s[0],o=[];
+  if(k=='r'){const[,x,y,w,h]=s;for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)o.push([i,j]);return o}
+  if(k=='e'){const[,cx,cy,rx,ry]=s;for(let j=Math.floor(cy-ry)-1;j<=Math.floor(cy+ry)+1;j++)for(let i=Math.floor(cx-rx)-1;i<=Math.floor(cx+rx)+1;i++)if(((i+.5-cx)/rx)**2+((j+.5-cy)/ry)**2<=1)o.push([i,j]);return o}
+  const p=s[1],xs=p.map(q=>q[0]),ys=p.map(q=>q[1]);
+  for(let j=Math.min(...ys);j<=Math.max(...ys);j++)for(let i=Math.min(...xs);i<=Math.max(...xs);i++){const px=i+.5,py=j+.5;let n=false;
+    for(let a=0;a<p.length;a++){const[x1,y1]=p[a],[x2,y2]=p[(a+1)%p.length];if((y1>py)!=(y2>py)&&px<(x2-x1)*(py-y1)/(y2-y1)+x1)n=!n}if(n)o.push([i,j])}
+  return o}
+function spr(P,D,x0,y0){const st=5,c={},f={};
+  P.forEach(([col,sh],idx)=>sh.forEach(s=>cl(s).forEach(([x,y])=>c[x+','+y]=[idx,col])));
+  for(const k in c){const[x,y]=k.split(',').map(Number),[idx,col]=c[k],up=c[x+','+(y-1)],dn=c[x+','+(y+1)],rt=c[(x+1)+','+y];
+    f[k]=(!up||up[0]!=idx)?shade(col,.25):(!dn||dn[0]!=idx||!rt||rt[0]!=idx)?shade(col,-.25):col}
+  D.forEach(([x,y,col])=>f[x+','+y]=col);
+  Object.keys(f).forEach(k=>{const[x,y]=k.split(',').map(Number);[[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,b])=>{const n=(x+a)+','+(y+b);if(!(n in f))f[n]='#12121c'})});
+  const by={};for(const k in f){const[x,y]=k.split(',').map(Number);(by[f[k]]=by[f[k]]||[]).push([y,x])}
+  let out='';
+  for(const col in by){const l=by[col].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);let d='',i=0;
+    while(i<l.length){const[y,x]=l[i];let n=1;while(i+n<l.length&&l[i+n][0]==y&&l[i+n][1]==x+n)n++;d+=`M${x0+x*st} ${y0+y*st}h${n*st}v${st}h-${n*st}z`;i+=n}
+    out+=`<path fill="${col}" d="${d}"/>`}
+  return out}
+const CH=[
+ t=>{const b=t;return[[['#3a4a7a',[R(9,27,4,6),R(13,27,4,6)]],['#e6edf3',[R(8,33,5,3),R(13,33,5,3)]],['#2ec4b6',[R(8,17+b,10,10)]],['#2ec4b6',[R(5,18+b,3,6),R(18,18+b,3,6)]],['#8b949e',[R(7,20+b,12,6)]],[SKIN,[R(5,24+b,3,2),R(18,24+b,3,2)]],[SKIN,[E(13,11+b,5,5.5)]],
+  ['#2a3b8f',[Pg([[7,10+b],[7,5+b],[9,3+b],[13,2+b],[17,3+b],[19,5+b],[19,10+b],[17,8+b],[13,6+b],[9,8+b]]),Pg([[10,3+b],[11,0+b],[13,3+b]]),Pg([[14,3+b],[16,0+b],[17,3+b]])]],['#ffd166',[R(6,9+b,2,4),R(18,9+b,2,4)]]],
+  [[10,11+b,EYE],[15,11+b,EYE],[13,14+b,'#c0504d'],[13,22+b,'#3fb950']]]},
+ t=>{const b=t;const P=[['#59636e',[R(9,26,8,5)]],[SKIN,[R(9,31,3,2),R(14,31,3,2)]],['#e63946',[R(8,33,5,3),R(13,33,5,3)]],['#2b2f3a',[R(8,17+b,10,9)]],[SKIN,[R(5,17+b,3,9),R(5,26+b,3,3)]],['#fff',[R(5,23+b,3,2)]]];
+  if(t==0)P.push([SKIN,[R(18,17,3,9),R(18,26,3,3)]],['#fff',[R(18,23,3,2)]],['#8b949e',[R(17,30,6,1)]],['#ff7b72',[R(16,29,2,3),R(22,29,2,3)]]);
+  else P.push([SKIN,[R(18,18,3,3),R(18,12,3,7),R(18,9,3,3)]],['#fff',[R(18,14,3,2)]],['#8b949e',[R(17,8,6,1)]],['#ff7b72',[R(16,7,2,3),R(22,7,2,3)]]);
+  P.push([SKIN,[E(13,11+b,5,5.5)]],['#e63946',[Pg([[7,9+b],[6,4+b],[9,6+b],[9,1+b],[12,5+b],[14,0+b],[16,5+b],[19,2+b],[19,8+b],[20,9+b]]),R(8,6+b,10,3)]],['#ffffff',[R(7,8+b,12,2)]]);
+  return[P,[[9,11+b,'#fff'],[10,11+b,EYE],[15,11+b,EYE],[16,11+b,'#fff'],[9,10+b,EYE],[10,10+b,EYE],[15,10+b,EYE],[16,10+b,EYE],[12,14+b,'#fff'],[13,14+b,'#fff'],[14,14+b,'#fff']]]},
+ t=>{const b=t;return[[['#c5cfe0',[Pg([[6,8+b],[7,3+b],[13,1+b],[19,3+b],[20,8+b],[21,25+b],[5,25+b]])]],['#2d3b7a',[E(13,29+b,9,3.5),E(6,28+b,2.5,2),E(20,28+b,2.5,2)]],['#3a4fa8',[R(8,17+b,10,10),R(5,18+b,3,9),R(18,18+b,3,9)]],['#e6edf3',[R(8,23+b,10,2)]],[SKIN,[R(6,27+b,3,2),R(17,27+b,3,2)]],[SKIN,[E(13,11+b,5,5.5)]],
+  ['#dfe6f0',[Pg([[7,10+b],[7,5+b],[13,2+b],[19,5+b],[19,10+b],[17,7+b],[13,6+b],[9,7+b]])]]],
+  [9,10,15,16].map(x=>[x,11+b,EYE]).concat([[13,6+b,'#7aa2ff'],[13,14+b,'#c0504d']])]},
+ t=>{const b=t,liq=t?'#d2a8ff':'#56d4dd';return[[['#2b2f3a',[R(9,28,4,5),R(13,28,4,5)]],['#111',[R(8,33,5,3),R(13,33,5,3)]],['#f0f3f8',[R(7,17+b,12,12)]],['#56d4dd',[R(12,17+b,2,10)]],['#f0f3f8',[R(4,18+b,3,9)]],[SKIN,[R(4,27+b,3,2)]],['#f0f3f8',[R(19,17+b,3,4),R(19,12+b,3,6)]],[SKIN,[R(19,9+b,3,3)]],
+  ['#9fe8f0',[R(21,2+b,2,3),Pg([[21,5+b],[23,5+b],[25,9+b],[19,9+b]])]],[liq,[R(20,7+b,5,2)]],[SKIN,[E(13,11+b,5,5.5)]],
+  ['#2ecc71',[Pg([[7,10+b],[6,5+b],[9,4+b],[10,1+b],[13,4+b],[16,1+b],[17,4+b],[20,5+b],[19,10+b],[17,7+b],[13,6+b],[9,7+b]])]],['#333',[R(7,6+b,12,2)]],['#56d4dd',[R(8,5+b,3,3),R(15,5+b,3,3)]]],
+  [[9,11+b,'#fff'],[10,11+b,EYE],[15,11+b,'#fff'],[16,11+b,EYE],[13,14+b,'#c0504d']]]}];
+const star=(x,y,s,c,b)=>`<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -6Q0 0 6 0Q0 0 0 6Q0 0 -6 0Q0 0 0 -6Z" fill="${c}">${an('opacity','0;1;0',2,0,b||0)}</path></g>`;
+const shadow='<ellipse cx="97" cy="196" rx="32" ry="5" fill="#000" opacity=".4"/>';
+function fx(i){
+  if(i==0){let f=`<ellipse cx="97" cy="110" rx="58" ry="80" fill="#2ec4b6" opacity=".12">${an('opacity','.08;.2;.08',2)}</ellipse>`+shadow;
+    [[30,'1'],[52,'0'],[150,'1'],[170,'0'],[40,'1'],[160,'0']].forEach(([x,c],k)=>f+=`<text x="${x}" y="180" fill="#3fb950" font-size="13" opacity="0">${c}${an('y','180;40',3,0,k*.5)}${an('opacity','0;.9;0',3,0,k*.5)}</text>`);return f}
+  if(i==1){const fa='M26 192Q8 120 58 84Q52 130 97 20Q142 130 136 84Q186 120 168 192Z',fb='M26 192Q4 126 60 76Q56 126 97 8Q138 126 134 76Q190 126 168 192Z';
+    let f=`<path d="${fa}" fill="#ff7b3a" opacity=".6">${an('d',`${fa};${fb};${fa}`,.7)}</path><path d="M52 192Q44 140 97 56Q150 140 142 192Z" fill="#ffd166" opacity=".4">${an('opacity','.25;.6;.25',.7)}</path>`+shadow;
+    [[14,90],[20,120],[10,150],[181,100],[175,130],[185,160]].forEach(([x,y],k)=>f+=`<line x1="${x}" y1="${y}" x2="${x+(x<90?14:-14)}" y2="${y}" stroke="#ffd166" stroke-width="2" stroke-linecap="round">${an('opacity','0;.9;0',.9,0,k*.15)}</line>`);
+    [62,134].forEach((x,k)=>f+=`<circle cx="${x}" cy="52" r="2.6" fill="#56d4dd">${an('cy','52;88',1.2,0,k*.5)}${an('opacity','1;0',1.2,0,k*.5)}</circle>`);return f}
+  if(i==2){let f='';[44,60,76].forEach((r,k)=>f+=`<circle cx="97" cy="110" r="${r}" fill="none" stroke="#7aa2ff" stroke-width="2" stroke-opacity=".5">${an('r',`${r};${r+8};${r}`,2.4,0,k*.4)}${an('stroke-opacity','.6;.1;.6',2.4,0,k*.4)}</circle>`);
+    return f+'<g><circle cx="97" cy="42" r="3.5" fill="#7aa2ff"/><circle cx="165" cy="110" r="2.6" fill="#d2a8ff"/><circle cx="97" cy="178" r="3" fill="#56d4dd"/><animateTransform attributeName="transform" type="rotate" from="0 97 110" to="360 97 110" dur="6s" repeatCount="indefinite"/></g>'+shadow+star(36,60,1.3,'#7aa2ff',.3)+star(160,72,1.1,'#d2a8ff',1.1)+star(152,165,1,'#56d4dd',.7)}
+  let f=`<ellipse cx="97" cy="110" rx="58" ry="80" fill="#a855f7" opacity=".12">${an('opacity','.08;.2;.08',2)}</ellipse>`+shadow;
+  [150,156,152].forEach((x,k)=>f+=`<circle cx="${x}" cy="48" r="2.4" fill="#fff">${an('cy','48;14',2,0,k*.6)}${an('opacity','1;0',2,0,k*.6)}</circle>`);
+  return f+star(30,62,1.2,'#d2a8ff')+star(48,36,.9,'#fff',.9)+star(172,90,1.1,'#56d4dd',.5)}
+function frameAnim(fr){const N=fr.length;return fr.map((s,k)=>{if(N<2)return s;let v,kt;
+  if(k==0){v='1;0;0';kt=`0;${1/N};1`}else if(k==N-1){v='0;1';kt=`0;${k/N}`}else{v='0;1;0;0';kt=`0;${k/N};${(k+1)/N};1`}
+  return `<g opacity="${k?0:1}">${s}<animate attributeName="opacity" calcMode="discrete" values="${v}" keyTimes="${kt}" dur="${N*.5}s" repeatCount="indefinite"/></g>`}).join('')}
+function customSpr(txt,pal){
+  const fr=txt.replace(/\r/g,'').split(/\n\s*\n/).map(b=>b.split('\n').map(l=>l.trimEnd()).filter(l=>l.length)).filter(f=>f.length).slice(0,4);
+  const f=fr.length?fr:[['.']],rows=Math.min(36,Math.max(...f.map(x=>x.length))),cols=Math.min(34,Math.max(...f.flat().map(l=>l.length)));
+  return {rows,cols,fr:f.map(x=>{const by={},D=[];
+    x.slice(0,36).forEach((row,y)=>[...row.slice(0,34)].forEach((ch,xx)=>{const k=ch.toUpperCase();if(!pal[k])return;if(k=='E'||k=='W')D.push([xx,y,pal[k]]);else(by[k]=by[k]||[]).push(R(xx,y,1,1))}));
+    return [Object.keys(by).map(k=>[pal[k],by[k]]),D]})}}
+function slotFig(i,A){
+  const sel=$('c_sel'+i).value;
+  if(sel=='c'){
+    const g=k=>$('c_'+i+'_'+k).value,pal={H:g('H'),S:g('S'),C:g('C'),P:g('P'),B:g('B'),E:EYE,W:'#fff',A:A,'#':A};
+    const c=customSpr($('c_grid'+i).value,pal),x0=97-Math.floor(c.cols*5/2),y0=192-c.rows*5;
+    return `<ellipse cx="97" cy="110" rx="58" ry="80" fill="${A}" opacity=".1">${an('opacity','.06;.16;.06',2)}</ellipse>`+shadow+frameAnim(c.fr.map(([P,D])=>spr(P,D,x0,y0)))+star(34,60,1.2,A,.3)+star(162,80,1,'#fff',1)}
+  const k=+sel;
+  return fx(k)+frameAnim([0,1].map(t=>{const[P,D]=CH[k](t);return spr(P,D,33,12)}))}
+function traitsSVG(A){
+  const T=pipe('t_traits',4);let b='';
+  for(let i=0;i<4;i++){const[t,s]=T[i]||['',''];
+    b+=`<g transform="translate(${30+i*215} 15)">`+rc(0,0,195,250,'#161b22','rx="10" stroke="#30363d"')+slotFig(i,A)+tx(97,218,t||'',A,15,1,'middle')+tx(97,238,s||'','#8b949e',12,0,'middle')+'</g>'}
+  return svgw(900,280,b);
+}
+const AV=['............','....HHHH....','...HHHHHH...','..HHHHHHHH..','..HSSSSSSH..','..SSESSESS..','..SSSSSSSS..','..SSSSSSSS..','...SSMMSS...','....SSSS....','.TTTTTTTTTT.','TTTTTTTTTTTT','TTTTTTTTTTTT','TTTTTTTTTTTT'];
+function idSVG(A,rows){
+  const cx=170,cy=20,cw=560,ch=260,cm={H:'#2d2a26',S:SKIN,E:'#111',M:'#b9854f',T:A};
+  let b=`<defs><clipPath id="idc"><rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="16"/></clipPath><linearGradient id="idg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1c2330"/><stop offset="1" stop-color="#0d1117"/></linearGradient><linearGradient id="ids" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>`;
+  b+=`<rect x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="16" fill="url(#idg)" stroke="${A}" stroke-opacity=".6"/><g clip-path="url(#idc)">`+rc(cx,cy,cw,44,A)+tx(cx+20,cy+28,$('t_idh').value||'DEVELOPER ID','#0d1117',14,1)+tx(cx+cw-20,cy+28,'ID: '+($('t_id').value||'ID-0001'),'#0d1117',13,1,'end')+rc(cx+20,cy+62,120,140,'#21262d','rx="6"');
+  AV.forEach((row,r)=>[...row].forEach((c,i)=>{if(cm[c])b+=rc(cx+20+i*10,cy+62+r*10,10,10,cm[c])}));
+  rows.slice(0,5).forEach(([k,v],i)=>{const y=cy+76+i*34;b+=tx(cx+170,y,k.toUpperCase(),'#8b949e',11)+tx(cx+170,y+17,v.slice(0,26),i==4?A:'#c9d1d9',16,1)});
+  for(let i=0;i<40;i++)b+=rc(cx+330+i*5,cy+205,2+(i*7)%4,36,'#8b949e','opacity=".7"');
+  b+=`<rect x="${cx-200}" y="${cy}" width="120" height="${ch}" fill="url(#ids)" transform="skewX(-20)"><animateTransform attributeName="transform" type="translate" values="0 0;760 0;760 0" keyTimes="0;.5;1" dur="5s" repeatCount="indefinite" additive="sum"/></rect></g>`;
+  return svgw(900,300,b);
+}
+function buildSVG(A){
+  let b=tx(40,68,"Let's build ",'#c9d1d9',34,1)+tx(40+12*20.4,68,'together',A,34,1)+rc(40+20*20.4+8,40,14,32,A,'',an('opacity','1;1;0;0',1.1,'0;.5;.5;1'))+tx(40,98,$('t_bsub').value,'#8b949e',14);
+  pipe('t_build',6).forEach((p,i)=>{const x=30+(i%3)*285,y=125+Math.floor(i/3)*85,last=i==5;
+    b+=rc(x,y,270,70,'#161b22',`rx="10" stroke="${last?A:'#30363d'}"`,last?an('stroke-opacity','1;.25;1',2):'')+tx(x+36,y+42,p[0]||'',A,18,1,'middle')+tx(x+70,y+30,p[1]||'','#c9d1d9',15,1)+tx(x+70,y+50,p[2]||'','#8b949e',12)});
+  return svgw(900,320,b);
+}
+const CARDS=[['skills','skills.svg','$ cat ~/skills',skillsSVG],['perf','performance.svg','$ ./performance --overall',perfSVG],['stats','stats.svg','$ ./stats',statsSVG],['traits','traits.svg','$ ./traits',traitsSVG],['id','idcard.svg','$ cat ~/id',null],['build','build.svg','',buildSVG]];
+function infoRows(){return [...document.querySelectorAll('.frow')].map(r=>[r.children[0].value.trim(),r.children[1].value.trim()||r.dataset.ph||'']).filter(r=>r[0]||r[1])}
+function files(){
+  const F=[['terminal.svg',build()],];
+  CARDS.forEach(([id,name,,fn])=>{if($('on_'+id).checked)F.push([name,id=='id'?idSVG(accent,infoRows()):fn(accent)])});
+  return F.map(([n,s])=>[n,ascii(s)]);
+}
+function readme(handle){
+  const L=[[$('l1').value,'LINKEDIN','linkedin','https://'],[$('l2').value,'WEBSITE','googlechrome','https://'],[$('l3').value,'EMAIL','gmail','mailto:'],[$('l4').value,'X','x','https://']].filter(l=>l[0].trim());
+  const b=L.map(l=>{let u=l[0].trim();if(l[3]=='mailto:'&&!u.startsWith('mailto:'))u='mailto:'+u;return `<a href="${u}"><img src="https://img.shields.io/badge/${l[1]}-0d1117?style=for-the-badge&logo=${l[2]}&logoColor=${accent.slice(1)}" alt="${l[1]}"/></a>`}).join('\n');
+  let s=`<div align="center">\n\n<img src="terminal.svg" alt="${handle}@github terminal" width="100%"/>\n\n<br/>\n\n${b}\n\n</div>\n`;
+  CARDS.forEach(([id,name,title])=>{if(!$('on_'+id).checked)return;
+    s+=id=='build'?`\n<br/>\n\n<img src="${name}" alt="Let's build together" width="100%"/>\n`:`\n### \`${title}\`\n\n<img src="${name}" alt="${title}" width="100%"/>\n`});
+  return s;
+}
+let FILES=[],RM='';const DECL='<?xml version="1.0" encoding="UTF-8"?>\n';
+function sel(){return FILES.find(f=>f[0]==$('ofile').value)||FILES[0]}
+function showCode(){$('code').textContent=DECL+sel()[1]}
+function render(){
+  FILES=files();
+  $('prev').innerHTML=FILES.map(f=>`<div>${f[1]}</div>`).join('');
+  const o=$('ofile'),cur=o.value;o.innerHTML=FILES.map(f=>`<option>${f[0]}</option>`).join('');if(FILES.some(f=>f[0]==cur))o.value=cur;
+  RM=readme(esc(($('handle').value.trim()||'your-username').replace(/\s+/g,'')));
+  showCode();$('readme').textContent=RM;
+}
+function say(t){$('msg').textContent=t;setTimeout(()=>{$('msg').textContent=''},2500)}
+async function copy(text,pre){
+  try{await navigator.clipboard.writeText(text);say('Copied ✓');return}catch(e){}
+  try{const r=document.createRange();r.selectNodeContents(pre);const s=getSelection();s.removeAllRanges();s.addRange(r);if(document.execCommand('copy')){say('Copied ✓');return}}catch(e){}
+  say('Text selected below. Press Ctrl+C (or Cmd+C) to copy.');
+}
+$('cs').onclick=()=>copy(DECL+sel()[1],$('code'));
+$('cr').onclick=()=>copy(RM,$('readme'));
+$('ds').onclick=()=>{const f=sel();
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([DECL+f[1]],{type:'image/svg+xml'}));a.download=f[0];document.body.appendChild(a);a.click();a.remove();say('Downloading…')}
+  catch(e){say('Use “Copy SVG” and save it as '+f[0])}
+};
+$('ofile').onchange=showCode;
+const EX='..#####..\n.#.....#.\n#..#.#..#\n#.......#\n#.#...#.#\n#..###..#\n.#.....#.\n..#####..\n\n..#####..\n.#.....#.\n#....#..#\n#.......#\n#.#...#.#\n#..###..#\n.#.....#.\n..#####..';
+$('grid').value=EX;
+$('t_skills').value=['Your skill 1: 90','Your skill 2: 85','Your skill 3: 80','Your skill 4: 75','Your skill 5: 70','Your skill 6: 65','Your skill 7: 60','Your skill 8: 55'].join('\n');
+$('t_perf').value=['Strength 1: 90','Strength 2: 85','Strength 3: 80','Strength 4: 95'].join('\n');
+$('t_stats').value=['3+ | Years Experience','10+ | Completed Projects','8+ | Technologies Mastered','1 | Achievement'].join('\n');
+$('t_traits').value=['DEDICATION | Showing up every day','HARD WORK | Reps build results','FOCUS | One goal, zero noise','CURIOSITY | Always testing ideas'].join('\n');
+$('t_build').value=['</> | Web Apps | Sites, dashboards, tools','AI | LLM & AI Tools | Agents, assistants, RAG','{ } | Data & Research | Analysis, models, papers','DNA | Your niche | Describe it here','-> | Automation | Save hours every week','+ | Your idea? | Let\'s talk about it'].join('\n');
+$('t_bsub').value='Open for freelance projects and collaborations.';
+const T1=['......HHHH......','....HHHHHHHH....','...HHHHHHHHHH...','...HHSSSSSSHH...','...HSSSSSSSSH...','...SSESSSSESS...','...SSSSSSSSSS...','....SSSSSSSS....','.....SSSSSS.....','...CCCCCCCCCC...','..CCCCCCCCCCCC..','.SCCCCCCCCCCCCS.','.SCCCCCCCCCCCCS.','.SCCCCCCCCCCCCS.','..CCCCCCCCCCCC..','....PPPPPPPP....','....PPPPPPPP....','....PPP..PPP....','....PPP..PPP....','....PPP..PPP....','...BBBB..BBBB...','...BBBB..BBBB...'];
+const TPL=T1.join('\n')+'\n\n'+['................',...T1.slice(0,15),...T1.slice(16)].join('\n');
+const CIDS=[],NAMES=['Coder','Athlete','Monk','Scientist'],PD={H:'#e63946',S:'#f2b88c',C:'#2ec4b6',P:'#3a4a7a',B:'#e6edf3'},PL={H:'Hair',S:'Skin',C:'Outfit',P:'Pants',B:'Boots'};
+for(let i=0;i<4;i++){
+  const d=document.createElement('div');
+  d.innerHTML=`<label for="c_sel${i}">Character ${i+1} artwork</label><select id="c_sel${i}">${NAMES.map((n,k)=>`<option value="${k}">${n}</option>`).join('')}<option value="c">Custom pixel art</option></select>
+  <div id="c_box${i}" style="display:none"><label for="c_grid${i}">Letters: H hair, S skin, C outfit, P pants, B boots, E eyes, W white, A accent. A blank line then another grid adds an animation frame (up to 4, max 34×36).</label>
+  <textarea id="c_grid${i}" rows="10" class="mono" spellcheck="false"></textarea>
+  <div class="sw" style="margin-top:6px">${Object.keys(PL).map(k=>`<span style="font-size:12px;color:var(--mut)">${PL[k]}</span><input type="color" id="c_${i}_${k}" value="${PD[k]}">`).join('')}</div>
+  <div class="row"><button type="button" id="c_tpl${i}">Load template</button></div></div>`;
+  $('chars').appendChild(d);
+  $('c_sel'+i).value=String(i);$('c_grid'+i).value=TPL;
+  $('c_sel'+i).addEventListener('change',()=>{$('c_box'+i).style.display=$('c_sel'+i).value=='c'?'block':'none'});
+  $('c_tpl'+i).onclick=()=>{$('c_grid'+i).value=TPL;render()};
+  CIDS.push('c_sel'+i,'c_grid'+i,...Object.keys(PL).map(k=>`c_${i}_${k}`));
+}
+$('gex').onclick=()=>{$('grid').value=EX;render()};
+$('art').addEventListener('change',()=>{$('cwrap').style.display=$('art').value=='custom'?'block':'none'});
+['handle','art','plan','l1','l2','l3','l4','grid','t_skills','t_perf','t_stats','t_traits','t_build','t_bsub','t_id','t_idh','on_skills','on_perf','on_stats','on_traits','on_id','on_build',...CIDS].forEach(id=>$(id).addEventListener('input',render));
+render();
+</script>
+
+</body>
+</html>
